@@ -1,0 +1,24 @@
+{
+  "opengothic": {
+    "url": "https://github.com/borsuczyna/OpenGothic-Android.git",
+    "commit": "118afdc10d79a7f3357e28c6ee52f6fc2fba8586"
+  },
+  "adrenotools": {
+    "url": "https://github.com/bylaws/libadrenotools.git",
+    "commit": "8fae8ce254dfc1344527e05301e43f37dea2df80"
+  },
+  "vulkan_headers": {
+    "url": "https://github.com/KhronosGroup/Vulkan-Headers.git",
+    "commit": "73814d006638aa00bd553215b054f0f02e457e22"
+  },
+  "turnip": {
+    "url": "https://github.com/K11MCH1/AdrenoToolsDrivers/releases/download/v24.3.0_r9/turnip_v24.3.0_R9v2.zip",
+    "sha256": "8a781186ed96d7f9b1620ae4caa508eb121b78af4b3777f0907dada34ce6714a",
+    "library": "vulkan.ad07xx.so",
+    "version": "Mesa Turnip 24.3 R9v2"
+  },
+  "base_apk": {
+    "url": "https://github.com/borsuczyna/OpenGothic-Android/releases/download/release/OpenGothic-0.7.4-touch-ui-118afdc-arm64.apk",
+    "sha256": "3de234596545b5ed39ffc063a3b2e88b44df0f6d872065a657958981e1e1dd8d"
+  }
+}

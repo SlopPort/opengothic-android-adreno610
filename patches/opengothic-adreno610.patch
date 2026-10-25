@@ -1,0 +1,291 @@
+diff --git a/common/game/compatibility/directmemory.cpp b/common/game/compatibility/directmemory.cpp
+index 5d79e92..5055332 100644
+--- a/common/game/compatibility/directmemory.cpp
++++ b/common/game/compatibility/directmemory.cpp
+@@ -2470,7 +2470,7 @@ void DirectMemory::setupNpcFunctions() {
+     auto* owned = npc->getItem(cls);
+     if(owned==nullptr)
+       return;
+-    if((owned->itemFlag() & ITM_TORCH)!=0)
++    if((uint32_t(owned->itemFlag()) & ITM_TORCH)!=0)
+       npc->setTorch(false);
+     else
+       npc->unequipItem(cls);
+diff --git a/common/gamemusic.cpp b/common/gamemusic.cpp
+index 2ed7840..27c77fd 100644
+--- a/common/gamemusic.cpp
++++ b/common/gamemusic.cpp
+@@ -111,7 +111,7 @@ struct GameMusic::RecordedMusic : Tempest::SoundProducer {
+       int16_t buffer[2048];
+       const size_t wanted = std::min(frames-done,size_t(1024));
+       int section = 0;
+-      const long bytes = ov_read(&source->file,reinterpret_cast<char*>(buffer),int(wanted*source->channels*2),0,2,1,&section);
++      const long bytes = ov_read(&source->file,reinterpret_cast<char*>(buffer),int(wanted*size_t(source->channels)*2),0,2,1,&section);
+       if(bytes<=0) {
+         if(bytes<0 || sought || ov_time_seek(&source->file,loopStart)!=0) {
+           std::fill(out+done*2,out+frames*2,int16_t(0));
+diff --git a/common/graphics/mesh/submesh/packedmesh.cpp b/common/graphics/mesh/submesh/packedmesh.cpp
+index 75168c9..33cb803 100644
+--- a/common/graphics/mesh/submesh/packedmesh.cpp
++++ b/common/graphics/mesh/submesh/packedmesh.cpp
+@@ -512,14 +512,14 @@ void PackedMesh::appendLods(const zenkit::MultiResolutionMesh& mesh, PkgType typ
+       const size_t vertexCount = (src.iboLength/MaxInd)*MaxVert;
+       dst.lod[level] = {uint32_t(indices.size()/MaxInd), uint32_t(src.iboLength/MaxInd)};
+       if(skeletal==nullptr)
+-        vertices.insert(vertices.end(), lod.vertices.begin()+firstVertex, lod.vertices.begin()+firstVertex+vertexCount);
++        vertices.insert(vertices.end(), lod.vertices.begin()+ptrdiff_t(firstVertex), lod.vertices.begin()+ptrdiff_t(firstVertex+vertexCount));
+       else
+-        verticesA.insert(verticesA.end(), lod.verticesA.begin()+firstVertex, lod.verticesA.begin()+firstVertex+vertexCount);
++        verticesA.insert(verticesA.end(), lod.verticesA.begin()+ptrdiff_t(firstVertex), lod.verticesA.begin()+ptrdiff_t(firstVertex+vertexCount));
+       for(size_t n=src.iboOffset; n<src.iboOffset+src.iboLength; ++n)
+         indices.push_back(uint32_t(vertexBase + lod.indices[n]-firstVertex));
+       const size_t firstByte = (src.iboOffset/MaxInd)*MaxPrim*4;
+       const size_t byteCount = (src.iboLength/MaxInd)*MaxPrim*4;
+-      indices8.insert(indices8.end(), lod.indices8.begin()+firstByte, lod.indices8.begin()+firstByte+byteCount);
++      indices8.insert(indices8.end(), lod.indices8.begin()+ptrdiff_t(firstByte), lod.indices8.begin()+ptrdiff_t(firstByte+byteCount));
+       }
+     }
+   }
+diff --git a/common/graphics/renderdistance.h b/common/graphics/renderdistance.h
+index 79dfafd..2f7f808 100644
+--- a/common/graphics/renderdistance.h
++++ b/common/graphics/renderdistance.h
+@@ -28,11 +28,11 @@ inline bool sphereVisible(float distanceSquared, float radius, float range) {
+ template<class Matrix>
+ float maxScale(const Matrix& matrix) {
+   float bound = 0;
+-  for(int i=0; i<3; ++i) {
++  for(size_t i=0; i<3; ++i) {
+     float row = 0;
+-    for(int j=0; j<3; ++j) {
++    for(size_t j=0; j<3; ++j) {
+       float dot = 0;
+-      for(int k=0; k<3; ++k)
++      for(size_t k=0; k<3; ++k)
+         dot += matrix[i][k]*matrix[j][k];
+       row += std::abs(dot);
+       }
+diff --git a/common/graphics/shaders.cpp b/common/graphics/shaders.cpp
+index 5ad652f..311e338 100644
+--- a/common/graphics/shaders.cpp
++++ b/common/graphics/shaders.cpp
+@@ -431,9 +431,11 @@ void Shaders::compileShaders() noexcept {
+     rtsmDbg          = postEffect("rtsm_dbg", RenderState::ZTestMode::Always);
+     }
+ 
+-  swRaytracing    = computeShader("sw_raytracing.comp.sprv");
+-  swRaytracing8   = computeShader("sw_raytracing8.comp.sprv");
+-  swRaytracing64  = computeShader("sw_raytracing64.comp.sprv");
++  if(opts.doSoftwareRT) {
++    swRaytracing    = computeShader("sw_raytracing.comp.sprv");
++    swRaytracing8   = computeShader("sw_raytracing8.comp.sprv");
++    swRaytracing64  = computeShader("sw_raytracing64.comp.sprv");
++    }
+ 
+   if(options().swRenderingPreset>0) {
+     switch(options().swRenderingPreset) {
+@@ -465,7 +467,9 @@ void Shaders::compileShaders() noexcept {
+ 
+ bool Shaders::isVsmSupported() {
+   auto& gpu = Resources::device().properties();
+-  if(gpu.compute.maxInvocations>=1024 && gpu.render.maxClipCullDistances>=4 &&
++  if(isLegacyAdreno(gpu.name))
++    return false;
++  if(gpu.compute.maxSharedMemory>=32*1024 && gpu.compute.maxInvocations>=1024 && gpu.render.maxClipCullDistances>=4 &&
+      gpu.render.maxViewportSize.w>=8192 && gpu.render.maxViewportSize.h>=8192) {
+     return true;
+     }
+diff --git a/common/mainwindow.cpp b/common/mainwindow.cpp
+index ca384fe..f2b8b27 100644
+--- a/common/mainwindow.cpp
++++ b/common/mainwindow.cpp
+@@ -1419,6 +1419,12 @@ void MainWindow::saveGame(std::string_view slot, std::string_view name) {
+     return;
+     }
+ 
++#ifdef __ANDROID__
++  // Avoid a GPU readback that deadlocks on the Redmi Note 8 Vulkan driver.
++  Attachment tex;
++  Pixmap pm(320, 180, TextureFormat::RGBA8);
++  std::memset(pm.data(), 0, pm.dataSize());
++#else
+   auto tex  = renderer.screenshoot(cmdId, Size(int(swapchain.w()),int(swapchain.h())));
+   auto lres = Attachment();
+ 
+@@ -1446,6 +1452,7 @@ void MainWindow::saveGame(std::string_view slot, std::string_view name) {
+ 
+   auto& thumb = lres.isEmpty() ? tex : lres;
+   auto  pm    = device.readPixels(textureCast<const Texture2d&>(thumb));
++#endif
+ 
+   Gothic::inst().startSave(std::move(textureCast<Texture2d&>(tex)),[slot=std::string(slot),name=std::string(name),pm](std::unique_ptr<GameSession>&& game){
+     if(!game)
+@@ -1570,6 +1577,7 @@ void MainWindow::setFullscreen(bool fs) {
+   }
+ 
+ void MainWindow::render(){
++
+   try {
+     static uint64_t time=Application::tickCount();
+ 
+diff --git a/common/world/objects/npc.cpp b/common/world/objects/npc.cpp
+index 33e6d74..024fc2b 100644
+--- a/common/world/objects/npc.cpp
++++ b/common/world/objects/npc.cpp
+@@ -4362,7 +4362,7 @@ void Npc::equipItem(size_t item) {
+   if(it==nullptr)
+     return;
+   // Equip is idempotent. Inventory::use toggles equipment, including torches.
+-  if((it->itemFlag() & ITM_TORCH)!=0) {
++  if((uint32_t(it->itemFlag()) & ITM_TORCH)!=0) {
+     setTorch(true);
+     return;
+     }
+diff --git a/shader/lighting/irradiance.comp b/shader/lighting/irradiance.comp
+index af19f86..69f0a7a 100644
+--- a/shader/lighting/irradiance.comp
++++ b/shader/lighting/irradiance.comp
+@@ -10,7 +10,7 @@ layout(local_size_x = 128) in;
+ 
+ shared vec4 samples[gl_WorkGroupSize.x][3][2]; // 12 Kb
+ 
+-layout(binding = 0) uniform writeonly image2D result;
++layout(binding = 0, rgba32f) uniform writeonly image2D result;
+ layout(binding = 1, std140) uniform UboScene {
+   SceneDesc scene;
+   };
+diff --git a/shader/materials/main.frag b/shader/materials/main.frag
+index f672893..c21e12f 100644
+--- a/shader/materials/main.frag
++++ b/shader/materials/main.frag
+@@ -14,8 +14,24 @@
+ 
+ #if defined(MAT_VARYINGS)
+ layout(location = 0) in flat uint bucketId;
++#if defined(OG_MOBILE_FLAT)
++Varyings shInp;
++#if defined(MAT_UV)
++layout(location = 1) in vec2 jjUv;
++#endif
++#if defined(MAT_NORMAL)
++layout(location = 2) in vec3 jjNormal;
++#endif
++#if defined(MAT_POSITION)
++layout(location = 3) in vec3 jjPosition;
++#endif
++#if defined(MAT_COLOR)
++layout(location = 4) in vec4 jjColor;
++#endif
++#else
+ layout(location = 1) in Varyings  shInp;
+ #endif
++#endif
+ 
+ #if defined(VIRTUAL_SHADOW)
+ layout(location = 3) in flat uint vsmMipId;
+@@ -150,12 +166,12 @@ vec4 diffuseTex() {
+   {
+     // FIXME: this not suppose to run for every-single material
+     if(texAniMapDirPeriod.x!=0) {
+-      uint fract = scene.tickCount32 % abs(texAniMapDirPeriod.x);
+-      texAnim.x  = float(fract)/float(texAniMapDirPeriod.x);
++      float fract = mod(float(scene.tickCount32), abs(float(texAniMapDirPeriod.x)));
++      texAnim.x  = fract/float(texAniMapDirPeriod.x);
+       }
+     if(texAniMapDirPeriod.y!=0) {
+-      uint fract = scene.tickCount32 % abs(texAniMapDirPeriod.y);
+-      texAnim.y  = float(fract)/float(texAniMapDirPeriod.y);
++      float fract = mod(float(scene.tickCount32), abs(float(texAniMapDirPeriod.y)));
++      texAnim.y  = fract/float(texAniMapDirPeriod.y);
+       }
+   }
+   const vec2 uv = shInp.uv + texAnim;
+@@ -323,6 +339,20 @@ void mainWater(vec4 t) {
+ #endif
+ 
+ void main() {
++#if defined(OG_MOBILE_FLAT)
++#if defined(MAT_UV)
++  shInp.uv = jjUv;
++#endif
++#if defined(MAT_NORMAL)
++  shInp.normal = jjNormal;
++#endif
++#if defined(MAT_POSITION)
++  shInp.pos = jjPosition;
++#endif
++#if defined(MAT_COLOR)
++  shInp.color = jjColor;
++#endif
++#endif
+ #if defined(MAT_UV)
+   vec4 t = diffuseTex();
+ #  if defined(ATEST)
+diff --git a/shader/materials/main.vert b/shader/materials/main.vert
+index 1cbb542..862196d 100644
+--- a/shader/materials/main.vert
++++ b/shader/materials/main.vert
+@@ -46,7 +46,22 @@ out gl_MeshPerVertexEXT {
+ 
+ #if defined(GL_VERTEX_SHADER) && defined(MAT_VARYINGS)
+ layout(location = 0) out flat uint bucketIdOut;
++#if defined(OG_MOBILE_FLAT)
++#if defined(MAT_UV)
++layout(location = 1) out vec2 jjUv;
++#endif
++#if defined(MAT_NORMAL)
++layout(location = 2) out vec3 jjNormal;
++#endif
++#if defined(MAT_POSITION)
++layout(location = 3) out vec3 jjPosition;
++#endif
++#if defined(MAT_COLOR)
++layout(location = 4) out vec4 jjColor;
++#endif
++#else
+ layout(location = 1) out Varyings  shOut;
++#endif
+ #elif defined(MAT_VARYINGS)
+ layout(location = 0) out flat uint bucketIdOut[]; //TODO: per-primitive
+ layout(location = 1) out Varyings  shOut[];
+@@ -208,21 +223,34 @@ void vertexShader(const uvec4 task) {
+   const uint  primCount  = mesh.y;
+ 
+   const uint  laneID     = gl_VertexIndex/3;
+-  if(laneID>=primCount) {
+-    gl_Position = vec4(uintBitsToFloat(0x7fc00000));
+-    return;
+-    }
+ 
+ #if defined(MAT_VARYINGS)
+   bucketIdOut = bucketId;
+ #endif
+ 
+   Varyings var;
+-  uint idx = processPrimitive(meshletId, bucketId, laneID)[gl_VertexIndex%3];
++  uvec3 triangle = processPrimitive(meshletId, bucketId, laneID);
++  uint corner = uint(gl_VertexIndex)%3u;
++  uint idx = corner==0u ? triangle.x : (corner==1u ? triangle.y : triangle.z);
+   vec4 pos = processVertex(var, instanceId, meshletId, bucketId, idx);
+-  gl_Position = pos;
++  gl_Position = laneID<primCount ? pos : vec4(2.0,2.0,2.0,1.0);
+ #if defined(MAT_VARYINGS)
++#if defined(OG_MOBILE_FLAT)
++#if defined(MAT_UV)
++  jjUv = var.uv;
++#endif
++#if defined(MAT_NORMAL)
++  jjNormal = var.normal;
++#endif
++#if defined(MAT_POSITION)
++  jjPosition = var.pos;
++#endif
++#if defined(MAT_COLOR)
++  jjColor = var.color;
++#endif
++#else
+   shOut       = var;
++#endif
+ #endif
+   }
+ #else

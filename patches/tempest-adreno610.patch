@@ -1,0 +1,71 @@
+diff --git a/Engine/gapi/vulkan/vcommandbuffer.cpp b/Engine/gapi/vulkan/vcommandbuffer.cpp
+index 140a653..3a45f82 100644
+--- a/Engine/gapi/vulkan/vcommandbuffer.cpp
++++ b/Engine/gapi/vulkan/vcommandbuffer.cpp
+@@ -143,7 +143,7 @@ static VkImageLayout toLayout(ResourceLayout rs, const VTexture* texture) {
+   if(rs==ResourceLayout::DepthReadOnly)
+     return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+   if(rs==ResourceLayout::DepthAttach)
+-    return VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
++    return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+ 
+   return VK_IMAGE_LAYOUT_GENERAL;
+   }
+diff --git a/Engine/gapi/vulkan/vdevice.cpp b/Engine/gapi/vulkan/vdevice.cpp
+index e1adb16..8ee5379 100644
+--- a/Engine/gapi/vulkan/vdevice.cpp
++++ b/Engine/gapi/vulkan/vdevice.cpp
+@@ -155,6 +155,7 @@ void VDevice::createLogicalDevice(VkPhysicalDevice pdev) {
+     }
+   if(props.hasSpirv_1_4) {
+     rqExt.push_back(VK_KHR_SPIRV_1_4_EXTENSION_NAME);
++    rqExt.push_back(VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
+     }
+   if(props.raytracing.rayQuery) {
+     rqExt.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+diff --git a/Engine/system/api/androidapi.cpp b/Engine/system/api/androidapi.cpp
+index 96b7829..091e29a 100644
+--- a/Engine/system/api/androidapi.cpp
++++ b/Engine/system/api/androidapi.cpp
+@@ -41,6 +41,13 @@ static bool             resumed    = false;
+ static bool             focused    = false;
+ static bool             active     = false;
+ static bool             hasWindow  = false;
++static AndroidApi::InputHandler appInputHandler = nullptr;
++static void* appInputUser = nullptr;
++
++void AndroidApi::setInputHandler(InputHandler handler, void* user) {
++  appInputHandler = handler;
++  appInputUser = user;
++  }
+ 
+ // Touches are recorded during polling and dispatched one per event-processing pass.
+ // Modal loops in event handlers poll recursively, so direct dispatch could reorder pointers of one AInputEvent.
+@@ -172,6 +179,8 @@ void AndroidApi::onAppCmd(void*, int32_t cmd) {
+ 
+ int32_t AndroidApi::onInputEvent(const void* input) {
+   const auto event = static_cast<const AInputEvent*>(input);
++  if(appInputHandler!=nullptr && appInputHandler(const_cast<AInputEvent*>(event),appInputUser)!=0)
++    return 1;
+   if(AInputEvent_getType(event)!=AINPUT_EVENT_TYPE_MOTION ||
+      (AInputEvent_getSource(event) & AINPUT_SOURCE_TOUCHSCREEN)!=AINPUT_SOURCE_TOUCHSCREEN)
+     return 0;
+diff --git a/Engine/system/api/androidapi.h b/Engine/system/api/androidapi.h
+index 54d4ec5..556e223 100644
+--- a/Engine/system/api/androidapi.h
++++ b/Engine/system/api/androidapi.h
+@@ -2,11 +2,14 @@
+ 
+ #include <Tempest/SystemApi>
+ #include <filesystem>
++struct AInputEvent;
+ 
+ namespace Tempest {
+ 
+ class AndroidApi final : SystemApi {
+   public:
++    using InputHandler = int32_t (*)(AInputEvent*, void*);
++    static void setInputHandler(InputHandler handler, void* user);
+     static std::filesystem::path internalDataPath();
+     static std::filesystem::path externalDataPath();
+ 

@@ -1,0 +1,13 @@
+diff --git a/android_linker_ns.cpp b/android_linker_ns.cpp
+index 3bd5899..4087404 100644
+--- a/android_linker_ns.cpp
++++ b/android_linker_ns.cpp
+@@ -126,7 +126,7 @@ static void *align_ptr(void *ptr) {
+ }
+ 
+ /* Private */
+-__attribute__((constructor)) static void resolve_linker_symbols() {
++__attribute__((constructor(101))) static void resolve_linker_symbols() {
+     using loader_dlopen_t = void *(*)(const char *, int, const void *);
+ 
+     if (android_get_device_api_level() < 28)
