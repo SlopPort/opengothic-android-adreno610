@@ -22,6 +22,8 @@ The full 3D renderer remains enabled. The shader patch includes compatibility ed
 
 Measured on the Redmi Note 8 below with one save, 25% 3D resolution, shadows and effects off, and a 30 FPS cap: about 8 FPS before these changes, about 30 FPS after them while standing or moving in a forest and at two city locations at night. A median frame took 33 ms and the slowest 1% about 50 ms. Crowded daytime scenes were not measured, and other devices are untested.
 
+Engine pin: OpenGothic-Android 0.9.2 (`531ffa0`). With these patches, a forest save at night on the Redmi Note 8 ran at about 30 FPS. The earlier measurements above were made on revision `118afdc`.
+
 ## Tested scope
 
 One Redmi Note 8 with Adreno 610, Android 16, ARM64, and 4 KiB memory pages. World rendering, movement, inventory, and saving/reloading were exercised with a locally assembled build. This is a limited device smoke test, not a compatibility matrix, performance benchmark, or full-game test.
