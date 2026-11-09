@@ -1,7 +1,7 @@
 {
   "opengothic": {
     "url": "https://github.com/borsuczyna/OpenGothic-Android.git",
-    "commit": "118afdc10d79a7f3357e28c6ee52f6fc2fba8586"
+    "commit": "531ffa00d82bca5a728861e0b0812bf097b15c80"
   },
   "adrenotools": {
     "url": "https://github.com/bylaws/libadrenotools.git",
@@ -18,7 +18,7 @@
     "version": "Mesa Turnip 24.3 R9v2"
   },
   "base_apk": {
-    "url": "https://github.com/borsuczyna/OpenGothic-Android/releases/download/release/OpenGothic-0.7.4-touch-ui-118afdc-arm64.apk",
-    "sha256": "3de234596545b5ed39ffc063a3b2e88b44df0f6d872065a657958981e1e1dd8d"
+    "url": "https://github.com/borsuczyna/OpenGothic-Android/releases/download/release/OpenGothic-apk-release.apk",
+    "sha256": "aea4fb4024f53b9385b4b01eaa456caf253e71632b932dff0784a543c4fd2ca2"
   }
 }

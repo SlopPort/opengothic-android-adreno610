@@ -1,8 +1,8 @@
 diff --git a/common/gothic.cpp b/common/gothic.cpp
-index 4f5735d..fdef933 100644
+index 4d09365..c7dd362 100644
 --- a/common/gothic.cpp
 +++ b/common/gothic.cpp
-@@ -109,10 +109,18 @@ Gothic::Gothic() {
+@@ -110,10 +110,18 @@ Gothic::Gothic() {
    defaults->set("ENGINE",       "zEnvMappingEnabled", 1); // reflections
    defaults->set("ENGINE",       "zCloudShadowScale", gpu.type==Tempest::DeviceType::Discrete); // ssao
    defaults->set("INTERNAL",     "vidResIndex", 0); // full-res
@@ -22,10 +22,10 @@ index 4f5735d..fdef933 100644
    defaults->set("VIDEO", "zVidBrightness", 0.5f);
    defaults->set("VIDEO", "zVidContrast",   0.5f);
 diff --git a/common/graphics/renderer.cpp b/common/graphics/renderer.cpp
-index 2edc389..a624cff 100644
+index f8ae2e3..0f24b1a 100644
 --- a/common/graphics/renderer.cpp
 +++ b/common/graphics/renderer.cpp
-@@ -696,8 +696,21 @@ void Renderer::draw(Tempest::Attachment& result, Encoder<CommandBuffer>& cmd, ui
+@@ -697,8 +697,21 @@ void Renderer::draw(Tempest::Attachment& result, Encoder<CommandBuffer>& cmd, ui
      return;
      }
  
@@ -46,9 +46,9 @@ index 2edc389..a624cff 100644
 +  if(!sky.lutIsInitialized || runPass(6,0))
 +    prepareSky(cmd, wview);
  
-   drawHiZ (cmd, wview);
-   buildHiZ(cmd);
-@@ -715,10 +728,12 @@ void Renderer::draw(Tempest::Attachment& result, Encoder<CommandBuffer>& cmd, ui
+   if(!SafeGpu::noHiZ()) {
+     drawHiZ (cmd, wview);
+@@ -718,10 +731,12 @@ void Renderer::draw(Tempest::Attachment& result, Encoder<CommandBuffer>& cmd, ui
  
    drawSwRT(cmd, wview);
  
@@ -63,7 +63,7 @@ index 2edc389..a624cff 100644
    prepareGi  (cmd, wview);
    prepareSurfels(cmd, wview);
  
-@@ -792,7 +807,12 @@ void Renderer::drawTonemapping(Attachment& result, Encoder<CommandBuffer>& cmd,
+@@ -795,7 +810,12 @@ void Renderer::drawTonemapping(Attachment& result, Encoder<CommandBuffer>& cmd,
    if(mul>0)
      p.mul = mul;
  
@@ -113,10 +113,10 @@ index d05f70e..ba0ff82 100644
      out.landCol = true;
      ret = true;
 diff --git a/common/world/objects/npc.cpp b/common/world/objects/npc.cpp
-index 024fc2b..93cd679 100644
+index 397006d..552d5c3 100644
 --- a/common/world/objects/npc.cpp
 +++ b/common/world/objects/npc.cpp
-@@ -5653,6 +5653,14 @@ void Npc::updateTransform() {
+@@ -5785,6 +5785,14 @@ void Npc::updateTransform() {
    }
  
  void Npc::updateAnimation(uint64_t dt, bool force) {
@@ -132,10 +132,10 @@ index 024fc2b..93cd679 100644
      visual.pose().setTimeScale(effects->modelTimeScale(*this),owner.tickCount());
    const auto camera = Gothic::inst().camera();
 diff --git a/common/world/objects/npc.h b/common/world/objects/npc.h
-index 7eaa28a..6c56495 100644
+index 1bf87e2..75bac51 100644
 --- a/common/world/objects/npc.h
 +++ b/common/world/objects/npc.h
-@@ -707,6 +707,7 @@ class Npc final {
+@@ -725,6 +725,7 @@ class Npc final {
  
      uint64_t                       aiOutputBarrier=0;
      NpcProcessPolicy               aiPolicy=NpcProcessPolicy::AiNormal;
