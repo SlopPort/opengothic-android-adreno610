@@ -38,6 +38,7 @@ def prepare(a):
     apply(engine / 'lib/Tempest', engine / 'patches/tempest-opengothic.patch')
     apply(engine / 'lib/ZenKit', engine / 'patches/zenkit-opengothic.patch')
     apply(engine, ROOT / 'patches/opengothic-adreno610.patch')
+    apply(engine, ROOT / 'patches/opengothic-mobile-performance.patch')
     apply(engine / 'lib/Tempest', ROOT / 'patches/tempest-adreno610.patch')
     if a.extra_engine_patch:
         apply(engine, a.extra_engine_patch.resolve())

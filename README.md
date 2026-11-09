@@ -16,11 +16,17 @@ This project is separate from the [experimental save converter](https://github.c
 
 The full 3D renderer remains enabled. The shader patch includes compatibility edits used during the investigation; its optional flat-varying macro is not enabled by the build tool.
 
+## Mobile performance
+
+`patches/opengothic-mobile-performance.patch` targets the touch build. It stops characters beyond 60 m from running collision tests and skips character-to-character tests from 30 to 60 m, updates distant character animation less often, refreshes sky, irradiance and fog tables every few frames, replaces the final Lanczos upscale with bilinear filtering, and shortens the default draw distance. Distant characters may pass through obstacles while out of view, and fog can lag slightly behind fast camera turns.
+
+Measured on the Redmi Note 8 below with one save, 25% 3D resolution, shadows and effects off, and a 30 FPS cap: about 8 FPS before these changes, about 30 FPS after them while standing or moving in a forest and at two city locations at night. A median frame took 33 ms and the slowest 1% about 50 ms. Crowded daytime scenes were not measured, and other devices are untested.
+
 ## Tested scope
 
 One Redmi Note 8 with Adreno 610, Android 16, ARM64, and 4 KiB memory pages. World rendering, movement, inventory, and saving/reloading were exercised with a locally assembled build. This is a limited device smoke test, not a compatibility matrix, performance benchmark, or full-game test.
 
-The selected driver is **Turnip 24.3 R9v2**, distributed by [K11MCH1/AdrenoToolsDrivers](https://github.com/K11MCH1/AdrenoToolsDrivers). It is downloaded separately and verified against the hash in `dependencies.json`. The loader's default `TU_DEBUG` flags are `sysmem,nobin,nolrz,noubwc`; they favor the tested compatibility configuration. No FPS improvement is claimed.
+The selected driver is **Turnip 24.3 R9v2**, distributed by [K11MCH1/AdrenoToolsDrivers](https://github.com/K11MCH1/AdrenoToolsDrivers). It is downloaded separately and verified against the hash in `dependencies.json`. The loader's default `TU_DEBUG` flags are `sysmem,nobin,nolrz,noubwc`; they favor the tested compatibility configuration. The driver flags made no measurable difference in the performance test below.
 
 Android 9+ is required by the custom-loader configuration. Other GPUs, ROMs, kernel versions, and 16 KiB-page devices are untested. Existing Android lifecycle limitations of the upstream port still apply: save before backgrounding or locking the phone.
 

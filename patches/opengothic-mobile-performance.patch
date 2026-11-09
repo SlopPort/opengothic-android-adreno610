@@ -1,0 +1,145 @@
+diff --git a/common/gothic.cpp b/common/gothic.cpp
+index 4f5735d..fdef933 100644
+--- a/common/gothic.cpp
++++ b/common/gothic.cpp
+@@ -109,10 +109,18 @@ Gothic::Gothic() {
+   defaults->set("ENGINE",       "zEnvMappingEnabled", 1); // reflections
+   defaults->set("ENGINE",       "zCloudShadowScale", gpu.type==Tempest::DeviceType::Discrete); // ssao
+   defaults->set("INTERNAL",     "vidResIndex", 0); // full-res
++#ifdef OPENGOTHIC_TOUCH_UI
++  defaults->set("PERFORMANCE", "sightValue", 1); // shorter default range for mobile GPUs
++#else
+   defaults->set("PERFORMANCE", "sightValue", 4); // 100%
++#endif
+   defaults->set("PERFORMANCE", "modelDetail", 1.f);
+   defaults->set("INTERNAL", "texDetailIndex", 1.f);
++#ifdef OPENGOTHIC_TOUCH_UI
++  defaults->set("ENGINE", "zVobFarClipZScale", 0.3f);
++#else
+   defaults->set("ENGINE", "zVobFarClipZScale", 1.f);
++#endif
+ 
+   defaults->set("VIDEO", "zVidBrightness", 0.5f);
+   defaults->set("VIDEO", "zVidContrast",   0.5f);
+diff --git a/common/graphics/renderer.cpp b/common/graphics/renderer.cpp
+index 2edc389..a624cff 100644
+--- a/common/graphics/renderer.cpp
++++ b/common/graphics/renderer.cpp
+@@ -696,8 +696,21 @@ void Renderer::draw(Tempest::Attachment& result, Encoder<CommandBuffer>& cmd, ui
+     return;
+     }
+ 
++  static uint32_t frameNum = 0;
++  ++frameNum;
++  // Slowly changing lighting tables need not be refreshed each frame on mobile GPUs
++  auto runPass = [](uint32_t period, uint32_t phase) {
++#ifdef OPENGOTHIC_TOUCH_UI
++    return frameNum<32 || frameNum%period==phase;
++#else
++    (void)period; (void)phase;
++    return true;
++#endif
++    };
++
+   wview.visibilityPass(cmd, 0);
+-  prepareSky(cmd, wview);
++  if(!sky.lutIsInitialized || runPass(6,0))
++    prepareSky(cmd, wview);
+ 
+   drawHiZ (cmd, wview);
+   buildHiZ(cmd);
+@@ -715,10 +728,12 @@ void Renderer::draw(Tempest::Attachment& result, Encoder<CommandBuffer>& cmd, ui
+ 
+   drawSwRT(cmd, wview);
+ 
+-  prepareIrradiance(cmd, wview);
++  if(runPass(12,1))
++    prepareIrradiance(cmd, wview);
+   prepareExposure(cmd, wview);
+   prepareSSAO(cmd, wview);
+-  prepareFog (cmd, wview);
++  if(runPass(3,0))
++    prepareFog (cmd, wview);
+   prepareGi  (cmd, wview);
+   prepareSurfels(cmd, wview);
+ 
+@@ -792,7 +807,12 @@ void Renderer::drawTonemapping(Attachment& result, Encoder<CommandBuffer>& cmd,
+   if(mul>0)
+     p.mul = mul;
+ 
+-  auto& pso = (settings.vidResIndex==0) ? shaders.tonemapping : shaders.tonemappingUpscale;
++#ifdef OPENGOTHIC_TOUCH_UI
++  const bool plainUpscale = true;   // Lanczos at native resolution is too slow for mobile GPUs
++#else
++  const bool plainUpscale = false;
++#endif
++  auto& pso = (settings.vidResIndex==0 || plainUpscale) ? shaders.tonemapping : shaders.tonemappingUpscale;
+   cmd.setFramebuffer({ {result, Tempest::Discard, Tempest::Preserve} });
+   cmd.setBinding(0, wview.sceneGlobals().uboGlobal[SceneGlobals::V_Main]);
+   // This Lanczos implementation pairs adjacent weights using bilinear sampling.
+diff --git a/common/physics/dynamicworld.cpp b/common/physics/dynamicworld.cpp
+index d05f70e..ba0ff82 100644
+--- a/common/physics/dynamicworld.cpp
++++ b/common/physics/dynamicworld.cpp
+@@ -12,6 +12,7 @@
+ 
+ #include "graphics/mesh/submesh/packedmesh.h"
+ #include "world/objects/item.h"
++#include "world/objects/npc.h"
+ #include "world/bullet.h"
+ #include "world/world.h"
+ 
+@@ -1160,9 +1161,22 @@ bool DynamicWorld::hasCollision(const NpcItem& it, CollisionTest& out) {
+   bool ret = false;
+ 
+   out.normal = Tempest::Vec3();
++#ifdef OPENGOTHIC_TOUCH_UI
++  // Mobile CPUs: characters out of the player's sight only follow their way points
++  auto  policy = NpcProcessPolicy::AiNormal;
++  if(auto body = dynamic_cast<NpcBody*>(it.obj))
++    if(auto npc = body->toNpc())
++      policy = npc->processPolicy();
++  if(policy==NpcProcessPolicy::AiFar2)
++    return false;
++  if(policy!=NpcProcessPolicy::AiFar && npcList->hasCollision(it,out.normal,out.npc,out.npcCol)){
++    ret = true;
++    }
++#else
+   if(npcList->hasCollision(it,out.normal,out.npc,out.npcCol)){
+     ret = true;
+     }
++#endif
+   if(world->hasCollision(*it.obj,out.normal,out.vob)) {
+     out.landCol = true;
+     ret = true;
+diff --git a/common/world/objects/npc.cpp b/common/world/objects/npc.cpp
+index 024fc2b..93cd679 100644
+--- a/common/world/objects/npc.cpp
++++ b/common/world/objects/npc.cpp
+@@ -5653,6 +5653,14 @@ void Npc::updateTransform() {
+   }
+ 
+ void Npc::updateAnimation(uint64_t dt, bool force) {
++#ifdef OPENGOTHIC_TOUCH_UI
++  // poses are computed from absolute time: distant characters can skip frames safely
++  if(!force && !isPlayer() && aiPolicy>=NpcProcessPolicy::AiFar) {
++    const uint32_t period = aiPolicy==NpcProcessPolicy::AiFar ? 3u : 12u;
++    if((animLodCounter++ + uint32_t(hnpc->id))%period!=0)
++      return;
++    }
++#endif
+   if(auto* effects = owner.globalFx())
+     visual.pose().setTimeScale(effects->modelTimeScale(*this),owner.tickCount());
+   const auto camera = Gothic::inst().camera();
+diff --git a/common/world/objects/npc.h b/common/world/objects/npc.h
+index 7eaa28a..6c56495 100644
+--- a/common/world/objects/npc.h
++++ b/common/world/objects/npc.h
+@@ -707,6 +707,7 @@ class Npc final {
+ 
+     uint64_t                       aiOutputBarrier=0;
+     NpcProcessPolicy               aiPolicy=NpcProcessPolicy::AiNormal;
++    uint32_t                       animLodCounter=0;
+     AiState                        aiState;
+     ScriptFn                       aiPrevState;
+     AiQueue                        aiQueue;
